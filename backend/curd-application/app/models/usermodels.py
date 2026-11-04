@@ -22,3 +22,8 @@ class updateUserAccount(BaseModel):
 class LoginUser(BaseModel):
     username: str
     user_password: str
+    
+class forgetPassword(BaseModel):
+    old_password: str
+    new_password: str
+    confirm_password: str

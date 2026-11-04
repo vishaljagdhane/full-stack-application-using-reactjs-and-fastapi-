@@ -1,6 +1,6 @@
 from fastapi import APIRouter,HTTPException
 from database.databaseconnection import get_database_connection  # Import the database connection function.
-from models.usermodels import userAccount,updateUserAccount,LoginUser  # Import the userAccount model for user data validation.
+from models.usermodels import userAccount,updateUserAccount,LoginUser,forgetPassword  # Import the userAccount model for user data validation.
 
 user_router =APIRouter()  # Create an instance of APIRouter for user-related routes.
 
@@ -141,5 +141,74 @@ def fetchUserAccountdata():
     else:
         return {"message": "Failed to connect to the database."}  # Return an error message if the database connection fails.
     
-
     
+
+@user_router.put("/forget-password/{user_id}", tags=["Users"])
+def forget_password(user_id: str, user: forgetPassword):
+
+    database_connection = get_database_connection()
+
+    if not database_connection:
+        raise HTTPException(
+            status_code=500,
+            detail="Database connection failed"
+        )
+
+    cursor = None
+
+    try:
+        cursor = database_connection.cursor()
+
+        # Check user exists
+        cursor.execute(
+            "SELECT user_id FROM userAccount WHERE user_id = %s",
+            (user_id,)
+        )
+
+        user_data = cursor.fetchone()
+
+        if not user_data:
+            raise HTTPException(
+                status_code=404,
+                detail="User not found"
+            )
+
+        # Check new password and confirm password
+        if user.new_password != user.confirm_password:
+            raise HTTPException(
+                status_code=400,
+                detail="New password and confirm password do not match"
+            )
+
+        # Update password
+        cursor.execute(
+            """
+            UPDATE userAccount
+            SET user_password = %s
+            WHERE user_id = %s
+            """,
+            (user.new_password, user_id)
+        )
+
+        database_connection.commit()
+
+        return {
+            "message": "User password updated successfully"
+        }
+
+    except HTTPException:
+        raise
+
+    except Exception as e:
+        database_connection.rollback()
+
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error updating password: {e}"
+        )
+
+    finally:
+        if cursor:
+            cursor.close()
+
+        database_connection.close()
